@@ -4,26 +4,6 @@ import tensorflow as tf
 import sys
 import os
 
-dataset_name = 'nyt'
-if len(sys.argv) > 1:
-    dataset_name = sys.argv[1]
-dataset_dir = os.path.join('./data', dataset_name)
-if not os.path.isdir(dataset_dir):
-    raise Exception("[ERROR] Dataset dir %s doesn't exist!" % (dataset_dir))
-
-# The first 3 parameters are train / test data file name, word embedding file name and relation-id mapping file name respectively.
-train_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'train.json'), 
-                                                        os.path.join(dataset_dir, 'word_vec.json'),
-                                                        os.path.join(dataset_dir, 'rel2id.json'), 
-                                                        mode=nrekit.data_loader.json_file_data_loader.MODE_RELFACT_BAG,
-                                                        shuffle=True)
-test_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'test.json'), 
-                                                       os.path.join(dataset_dir, 'word_vec.json'),
-                                                       os.path.join(dataset_dir, 'rel2id.json'), 
-                                                       mode=nrekit.data_loader.json_file_data_loader.MODE_ENTPAIR_BAG,
-                                                       shuffle=False)
-
-framework = nrekit.framework.re_framework(train_loader, test_loader)
 
 class model(nrekit.framework.re_model):
     encoder = "pcnn"
@@ -94,9 +74,36 @@ class model(nrekit.framework.re_model):
             print("Finish calculating")
         return weights_table
 
-if len(sys.argv) > 2:
-    model.encoder = sys.argv[2]
-if len(sys.argv) > 3:
-    model.selector = sys.argv[3]
 
-framework.train(model, ckpt_dir="checkpoint", model_name=dataset_name + "_" + model.encoder + "_" + model.selector, max_epoch=60, gpu_nums=1)
+def main():
+    dataset_name = 'nyt'
+    if len(sys.argv) > 1:
+        dataset_name = sys.argv[1]
+    dataset_dir = os.path.join('./data', dataset_name)
+    if not os.path.isdir(dataset_dir):
+        raise Exception("[ERROR] Dataset dir %s doesn't exist!" % (dataset_dir))
+
+    # The first 3 parameters are train / test data file name, word embedding file name and relation-id mapping file name respectively.
+    train_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'train.json'),
+                                                            os.path.join(dataset_dir, 'word_vec.json'),
+                                                            os.path.join(dataset_dir, 'rel2id.json'),
+                                                            mode=nrekit.data_loader.json_file_data_loader.MODE_RELFACT_BAG,
+                                                            shuffle=True)
+    test_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'test.json'),
+                                                           os.path.join(dataset_dir, 'word_vec.json'),
+                                                           os.path.join(dataset_dir, 'rel2id.json'),
+                                                           mode=nrekit.data_loader.json_file_data_loader.MODE_ENTPAIR_BAG,
+                                                           shuffle=False)
+
+    framework = nrekit.framework.re_framework(train_loader, test_loader)
+
+    if len(sys.argv) > 2:
+        model.encoder = sys.argv[2]
+    if len(sys.argv) > 3:
+        model.selector = sys.argv[3]
+
+    framework.train(model, ckpt_dir="checkpoint", model_name=dataset_name + "_" + model.encoder + "_" + model.selector, max_epoch=60, gpu_nums=1)
+
+
+if __name__ == '__main__':
+    main()
