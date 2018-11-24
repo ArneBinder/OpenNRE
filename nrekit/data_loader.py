@@ -9,7 +9,7 @@ import random
 class file_data_loader:
     def __next__(self):
         raise NotImplementedError
-    
+
     def next(self):
         return self.__next__()
 
@@ -32,12 +32,12 @@ class npy_data_loader(file_data_loader):
         self.max_length = max_length
         self.batch_size = batch_size
         self.word_vec_mat = np.load(os.path.join(data_dir, word_vec_npy))
-        self.data_word = np.load(os.path.join(data_dir, prefix + "_word.npy")) 
-        self.data_pos1 = np.load(os.path.join(data_dir, prefix + "_pos1.npy")) 
-        self.data_pos2 = np.load(os.path.join(data_dir, prefix + "_pos2.npy")) 
-        self.data_mask = np.load(os.path.join(data_dir, prefix + "_mask.npy")) 
-        self.data_rel = np.load(os.path.join(data_dir, prefix + "_label.npy")) 
-        self.data_length = np.load(os.path.join(data_dir, prefix + "_len.npy")) 
+        self.data_word = np.load(os.path.join(data_dir, prefix + "_word.npy"))
+        self.data_pos1 = np.load(os.path.join(data_dir, prefix + "_pos1.npy"))
+        self.data_pos2 = np.load(os.path.join(data_dir, prefix + "_pos2.npy"))
+        self.data_mask = np.load(os.path.join(data_dir, prefix + "_mask.npy"))
+        self.data_rel = np.load(os.path.join(data_dir, prefix + "_label.npy"))
+        self.data_length = np.load(os.path.join(data_dir, prefix + "_len.npy"))
         self.scope = np.load(os.path.join(data_dir, prefix + "_instance_scope.npy"))
         self.triple = np.load(os.path.join(data_dir, prefix + "_instance_triple.npy"))
         self.relfact_tot = len(self.triple)
@@ -54,7 +54,7 @@ class npy_data_loader(file_data_loader):
         self.idx = 0
 
         if self.shuffle:
-            random.shuffle(self.order) 
+            random.shuffle(self.order)
 
         print("Total relation fact: %d" % (self.relfact_tot))
 
@@ -65,7 +65,7 @@ class npy_data_loader(file_data_loader):
         if self.idx >= len(self.order):
             self.idx = 0
             if self.shuffle:
-                random.shuffle(self.order) 
+                random.shuffle(self.order)
             raise StopIteration
 
         batch_data = {}
@@ -76,7 +76,7 @@ class npy_data_loader(file_data_loader):
             if idx1 > len(self.order):
                 self.idx = 0
                 if self.shuffle:
-                    random.shuffle(self.order) 
+                    random.shuffle(self.order)
                 raise StopIteration
             self.idx = idx1
             batch_data['word'] = self.data_word[idx0:idx1]
@@ -91,7 +91,7 @@ class npy_data_loader(file_data_loader):
             if idx1 > len(self.order):
                 self.idx = 0
                 if self.shuffle:
-                    random.shuffle(self.order) 
+                    random.shuffle(self.order)
                 raise StopIteration
             self.idx = idx1
             _word = []
@@ -238,7 +238,7 @@ class json_file_data_loader(file_data_loader):
             print("Loading word vector file...")
             self.ori_word_vec = json.load(open(self.word_vec_file_name, "r"))
             print("Finish loading")
-            
+
             # Eliminate case sensitive
             if not case_sensitive:
                 print("Elimiating case sensitive problem...")
@@ -252,7 +252,7 @@ class json_file_data_loader(file_data_loader):
             print("Sort data...")
             self.ori_data.sort(key=lambda a: a['head']['id'] + '#' + a['tail']['id'] + '#' + a['relation'])
             print("Finish sorting")
-       
+
             # Pre-process word vec
             self.word2id = {}
             self.word_vec_tot = len(self.ori_word_vec)
@@ -274,11 +274,13 @@ class json_file_data_loader(file_data_loader):
 
             # Pre-process data
             print("Pre-processing data...")
+            nbr_tokens = 0
+            nbr_unk = 0
             self.instance_tot = len(self.ori_data)
             self.entpair2scope = {} # (head, tail) -> scope
             self.relfact2scope = {} # (head, tail, relation) -> scope
             self.data_word = np.zeros((self.instance_tot, self.max_length), dtype=np.int32)
-            self.data_pos1 = np.zeros((self.instance_tot, self.max_length), dtype=np.int32) 
+            self.data_pos1 = np.zeros((self.instance_tot, self.max_length), dtype=np.int32)
             self.data_pos2 = np.zeros((self.instance_tot, self.max_length), dtype=np.int32)
             self.data_rel = np.zeros((self.instance_tot), dtype=np.int32)
             self.data_mask = np.zeros((self.instance_tot, self.max_length), dtype=np.int32)
@@ -332,7 +334,7 @@ class json_file_data_loader(file_data_loader):
                 #     raise Exception("[ERROR] Sentence doesn't contain the entity, index = {}, sentence = {}, head = {}, tail = {}".format(i, sentence, head, tail))
 
                 words = sentence.split()
-                cur_ref_data_word = self.data_word[i]         
+                cur_ref_data_word = self.data_word[i]
                 cur_pos = 0
                 pos1 = -1
                 pos2 = -1
@@ -342,6 +344,8 @@ class json_file_data_loader(file_data_loader):
                             cur_ref_data_word[j] = self.word2id[word]
                         else:
                             cur_ref_data_word[j] = UNK
+                            nbr_unk += 1
+                        nbr_tokens += 1
                     if cur_pos == p1:
                         pos1 = j
                         p1 = -1
@@ -373,13 +377,15 @@ class json_file_data_loader(file_data_loader):
                         self.data_mask[i][j] = 2
                     else:
                         self.data_mask[i][j] = 3
-                    
+
             if last_entpair != '':
                 self.entpair2scope[last_entpair] = [last_entpair_pos, self.instance_tot] # left closed right open
             if last_relfact != '':
                 self.relfact2scope[last_relfact] = [last_relfact_pos, self.instance_tot]
 
-            print("Finish pre-processing")     
+            print('number of tokens total: %i' % nbr_tokens)
+            print('number of tokens unknown: %i' % nbr_unk)
+            print("Finish pre-processing")
 
             print("Storing processed files...")
             name_prefix = '.'.join(file_name.split('/')[-1].split('.')[:-1])
@@ -429,7 +435,7 @@ class json_file_data_loader(file_data_loader):
         self.idx = 0
 
         if self.shuffle:
-            random.shuffle(self.order) 
+            random.shuffle(self.order)
 
         print("Total relation fact: %d" % (self.relfact_tot))
 
@@ -443,7 +449,7 @@ class json_file_data_loader(file_data_loader):
         if self.idx >= len(self.order):
             self.idx = 0
             if self.shuffle:
-                random.shuffle(self.order) 
+                random.shuffle(self.order)
             raise StopIteration
 
         batch_data = {}
