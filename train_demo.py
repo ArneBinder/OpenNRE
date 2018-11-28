@@ -35,7 +35,8 @@ def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=
     #model_name = dataset + "_" + model.encoder + "_" + model.selector + '_pe' + str(use_prepared_embeddings)
     model_name = get_name(dataset, model.encoder, model.selector, use_prepared_embeddings)
     dir_train = os.path.join('./train', model_name)
-    os.makedirs(dir_train)
+    if not os.path.exists(dir_train):
+        os.makedirs(dir_train)
     dir_checkpoint = os.path.join(dir_train, "checkpoint")
     dir_summary = os.path.join(dir_train, "summary")
 
@@ -43,7 +44,7 @@ def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=
         model, ckpt_dir=dir_checkpoint,
         summary_dir=dir_summary,
         model_name=model_name,
-        max_epoch=60, gpu_nums=1)
+        max_epoch=60, gpu_nums=None)
 
 
 if __name__ == '__main__':
