@@ -1,103 +1,102 @@
+import subprocess
+
 import nrekit
-import numpy as np
-import tensorflow as tf
-import sys
 import os
 import json
 
-dataset_name = 'nyt'
-if len(sys.argv) > 1:
-    dataset_name = sys.argv[1]
-dataset_dir = os.path.join('./data', dataset_name)
-if not os.path.isdir(dataset_dir):
-    raise Exception("[ERROR] Dataset dir %s doesn't exist!" % (dataset_dir))
+from model_demo import model, get_name
 
-# The first 3 parameters are train / test data file name, word embedding file name and relation-id mapping file name respectively.
-train_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'train.json'), 
-                                                        os.path.join(dataset_dir, 'word_vec.json'),
-                                                        os.path.join(dataset_dir, 'rel2id.json'), 
-                                                        mode=nrekit.data_loader.json_file_data_loader.MODE_RELFACT_BAG,
-                                                        shuffle=True)
-test_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'test.json'), 
-                                                       os.path.join(dataset_dir, 'word_vec.json'),
-                                                       os.path.join(dataset_dir, 'rel2id.json'), 
-                                                       mode=nrekit.data_loader.json_file_data_loader.MODE_ENTPAIR_BAG,
-                                                       shuffle=False)
 
-framework = nrekit.framework.re_framework(train_loader, test_loader)
+def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=False):
+    model.encoder = encoder
+    model.selector = selector
+    model_name = get_name(dataset, model.encoder, model.selector, use_prepared_embeddings)
+    out_fn = os.path.join('./test_result', model_name + "_pred.json")
+    dataset_dir = os.path.join('./data', dataset)
+    if os.path.exists(out_fn):
+        print('result file already exists: %s' % out_fn)
+        pred_result = json.load(open(out_fn))
+    else:
+        if not os.path.isdir(dataset_dir):
+            raise Exception("[ERROR] Dataset dir %s doesn't exist!" % (dataset_dir))
 
-class model(nrekit.framework.re_model):
-    encoder = "pcnn"
-    selector = "att"
+        # The first 3 parameters are train / test data file name, word embedding file name and relation-id mapping file name respectively.
+        train_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'train.json'),
+                                                                os.path.join(dataset_dir, 'word_vec.json'),
+                                                                os.path.join(dataset_dir, 'rel2id.json'),
+                                                                mode=nrekit.data_loader.json_file_data_loader.MODE_RELFACT_BAG,
+                                                                shuffle=True,
+                                                                use_prepared_embeddings=use_prepared_embeddings)
+        test_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'test.json'),
+                                                               os.path.join(dataset_dir, 'word_vec.json'),
+                                                               os.path.join(dataset_dir, 'rel2id.json'),
+                                                               mode=nrekit.data_loader.json_file_data_loader.MODE_ENTPAIR_BAG,
+                                                               shuffle=False,
+                                                               use_prepared_embeddings=use_prepared_embeddings)
 
-    def __init__(self, train_data_loader, batch_size, max_length=120):
-        nrekit.framework.re_model.__init__(self, train_data_loader, batch_size, max_length=max_length)
-        self.mask = tf.placeholder(dtype=tf.int32, shape=[None, max_length], name="mask")
-        
-        # Embedding
-        x = nrekit.network.embedding.word_position_embedding(self.word, self.word_vec_mat, self.pos1, self.pos2)
+        framework = nrekit.framework.re_framework(train_loader, test_loader)
 
-        # Encoder
-        if model.encoder == "pcnn":
-            x_train = nrekit.network.encoder.pcnn(x, self.mask, keep_prob=0.5)
-            x_test = nrekit.network.encoder.pcnn(x, self.mask, keep_prob=1.0)
-        elif model.encoder == "cnn":
-            x_train = nrekit.network.encoder.cnn(x, keep_prob=0.5)
-            x_test = nrekit.network.encoder.cnn(x, keep_prob=1.0)
-        elif model.encoder == "rnn":
-            x_train = nrekit.network.encoder.rnn(x, self.length, keep_prob=0.5)
-            x_test = nrekit.network.encoder.rnn(x, self.length, keep_prob=1.0)
-        elif model.encoder == "birnn":
-            x_train = nrekit.network.encoder.birnn(x, self.length, keep_prob=0.5)
-            x_test = nrekit.network.encoder.birnn(x, self.length, keep_prob=1.0)
-        else:
-            raise NotImplementedError
+        auc, pred_result = framework.test(model, ckpt=os.path.join('train', model_name, 'checkpoint', model_name), return_result=True)
 
-        # Selector
-        if model.selector == "att":
-            self._train_logit, train_repre = nrekit.network.selector.bag_attention(x_train, self.scope, self.ins_label, self.rel_tot, True, keep_prob=0.5)
-            self._test_logit, test_repre = nrekit.network.selector.bag_attention(x_test, self.scope, self.ins_label, self.rel_tot, False, keep_prob=1.0)
-        elif model.selector == "ave":
-            self._train_logit, train_repre = nrekit.network.selector.bag_average(x_train, self.scope, self.rel_tot, keep_prob=0.5)
-            self._test_logit, test_repre = nrekit.network.selector.bag_average(x_test, self.scope, self.rel_tot, keep_prob=1.0)
-            self._test_logit = tf.nn.softmax(self._test_logit)
-        elif model.selector == "max":
-            self._train_logit, train_repre = nrekit.network.selector.bag_maximum(x_train, self.scope, self.ins_label, self.rel_tot, True, keep_prob=0.5)
-            self._test_logit, test_repre = nrekit.network.selector.bag_maximum(x_test, self.scope, self.ins_label, self.rel_tot, False, keep_prob=1.0)
-            self._test_logit = tf.nn.softmax(self._test_logit)
-        else:
-            raise NotImplementedError
-        
-        # Classifier
-        self._loss = nrekit.network.classifier.softmax_cross_entropy(self._train_logit, self.label, self.rel_tot, weights_table=self.get_weights())
- 
-    def loss(self):
-        return self._loss
+        if not os.path.exists('./test_result'):
+            os.makedirs('./test_result')
+        with open(out_fn, 'w') as outfile:
+            json.dump(pred_result, outfile)
 
-    def train_logit(self):
-        return self._train_logit
+    if dataset.lower().startswith('semeval'):
+        rel2id_fn = os.path.join('./data', dataset, 'rel2id.json')
+        rel2id = json.load(open(rel2id_fn))
+        fn_predictions_semeval = os.path.splitext(out_fn)[0] + '_semeval.tsv'
 
-    def test_logit(self):
-        return self._test_logit
+        fn_gold_tsv = os.path.join(dataset_dir, 'TEST_FILE_KEY_DIRECTION.TXT')
+        if not os.path.exists(fn_gold_tsv):
+            fn_gold_full = os.path.join(dataset_dir, 'TEST_FILE_FULL.TXT')
+            print('%s not found. convert %s ...' % (fn_gold_tsv, fn_gold_full))
+            convert_semeval_full_test_file_to_key_w_direction(fn_gold_full, fn_gold_tsv)
 
-    def get_weights(self):
-        with tf.variable_scope("weights_table", reuse=tf.AUTO_REUSE):
-            print("Calculating weights_table...")
-            _weights_table = np.zeros((self.rel_tot), dtype=np.float32)
-            for i in range(len(self.train_data_loader.data_rel)):
-                _weights_table[self.train_data_loader.data_rel[i]] += 1.0 
-            _weights_table = 1 / (_weights_table ** 0.05)
-            weights_table = tf.get_variable(name='weights_table', dtype=tf.float32, trainable=False, initializer=_weights_table)
-            print("Finish calculating")
-        return weights_table
+        eval_as_semeval(pred_result, rel2id, fn_predictions_semeval,
+                        fn_gold_tsv=os.path.join(dataset_dir, 'TEST_FILE_KEY_DIRECTION.TXT'),
+                        fn_script=os.path.join(dataset_dir, 'semeval2010_task8_scorer-v1.2.pl'))
 
-if len(sys.argv) > 2:
-    model.encoder = sys.argv[2]
-if len(sys.argv) > 3:
-    model.selector = sys.argv[3]
 
-auc, pred_result = framework.test(model, ckpt="./checkpoint/" + dataset_name + "_" + model.encoder + "_" + model.selector, return_result=True)
+def convert_semeval_full_test_file_to_key_w_direction(fn_test_file_full, fn_test_file_key_direction):
+    lines_in = list(open(fn_test_file_full).readlines())
+    res = []
+    for i in range(0, len(lines_in), 4):
+        res.append((lines_in[i].split('\t')[0], lines_in[i + 1].strip()))
+    open(fn_test_file_key_direction, 'w').writelines(('%s\t%s\n' % (_id, _rel) for _id, _rel in res))
 
-with open('./test_result/' + dataset_name + "_" + model.encoder + "_" + model.selector + "_pred.json", 'w') as outfile:
-    json.dump(pred_result, outfile)
 
+def eval_as_semeval(res, rel2id, fn_predictions_tsv, fn_gold_tsv, fn_script):
+    rel2id_rev = {v: k for k, v in rel2id.items()}
+    _res = {}
+
+    for record in res:
+        _id = int(record['entpair'].split('/')[0])
+        _rel = rel2id_rev[record['relation']]
+        if _rel == 'NA':
+            _rel = 'Other'
+        _score = record['score']
+        _res.setdefault(_id, {})[_rel] = _score
+
+    _res_max = {}
+    for _id in _res:
+        scores = _res[_id]
+        _res_max[_id] = max(scores, key=(lambda key: scores[key]))
+
+    print('write predictions formatted for semeval2010task8 to %s' % fn_predictions_tsv)
+    with open(fn_predictions_tsv, 'w') as f:
+        f.writelines(('%i\t%s\n' % (_id, _res_max[_id]) for _id in sorted(_res_max)))
+
+    check_script = 'perl %s %s %s' % (fn_script, fn_predictions_tsv, fn_gold_tsv)
+    perl_result = subprocess.check_output(check_script, shell=True)
+    last_line = perl_result.split('\n')[-2]
+    score_str = last_line.replace('<<< The official score is (9+1)-way evaluation with directionality taken into account: macro-averaged F1 = ', '').replace('% >>>', '')
+    f1 = float(score_str) / 100
+    print('macro-averaged F1 = %f' % f1)
+    return f1
+
+
+if __name__ == '__main__':
+    import plac; plac.call(main)
+    print('done')
