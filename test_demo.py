@@ -89,7 +89,7 @@ def eval_as_semeval(res, rel2id, fn_predictions_tsv, fn_gold_tsv, fn_script):
         f.writelines(('%i\t%s\n' % (_id, _res_max[_id]) for _id in sorted(_res_max)))
 
     check_script = 'perl %s %s %s' % (fn_script, fn_predictions_tsv, fn_gold_tsv)
-    perl_result = subprocess.check_output(check_script, shell=True)
+    perl_result = subprocess.check_output(check_script, shell=True).decode("utf-8")
     last_line = perl_result.split('\n')[-2]
     score_str = last_line.replace('<<< The official score is (9+1)-way evaluation with directionality taken into account: macro-averaged F1 = ', '').replace('% >>>', '')
     f1 = float(score_str) / 100
