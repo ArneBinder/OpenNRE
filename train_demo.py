@@ -106,7 +106,7 @@ def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=
     model.selector = selector
 
     framework.train(
-        model, ckpt_dir="checkpoint",
+        model, ckpt_dir="checkpoint_pe" + str(use_prepared_embeddings),
         model_name=dataset + "_" + model.encoder + "_" + model.selector + '_pe' + str(use_prepared_embeddings),
         max_epoch=60, gpu_nums=1)
 
