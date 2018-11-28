@@ -145,6 +145,7 @@ class re_framework:
         tower_grads = []
         tower_models = []
         for gpu_id in range(gpu_nums):
+            print('use /gpu:%d' % gpu_id)
             with tf.device("/gpu:%d" % gpu_id):
                 with tf.name_scope("gpu_%d" % gpu_id):
                     cur_model = model(self.train_data_loader, self.train_data_loader.batch_size // gpu_nums, self.train_data_loader.max_length)
