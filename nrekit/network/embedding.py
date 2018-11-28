@@ -26,7 +26,10 @@ def pos_embedding(pos1, pos2, var_scope=None, pos_embedding_dim=5, max_length=12
         x = tf.concat([input_pos1, input_pos2], -1)
         return x
 
-def word_position_embedding(word, word_vec_mat, pos1, pos2, var_scope=None, word_embedding_dim=50, pos_embedding_dim=5, max_length=120, add_unk_and_blank=True):
-    w_embedding = word_embedding(word, word_vec_mat, var_scope=var_scope, word_embedding_dim=word_embedding_dim, add_unk_and_blank=add_unk_and_blank)
-    p_embedding = pos_embedding(pos1, pos2, var_scope=var_scope, pos_embedding_dim=pos_embedding_dim, max_length=max_length)
-    return tf.concat([w_embedding, p_embedding], -1)
+def word_position_embedding(word, word_vec_mat, pos1, pos2, prepared_embedding=None, var_scope=None, word_embedding_dim=50, pos_embedding_dim=5, max_length=120, add_unk_and_blank=True):
+    embeddings = []
+    embeddings.append(word_embedding(word, word_vec_mat, var_scope=var_scope, word_embedding_dim=word_embedding_dim, add_unk_and_blank=add_unk_and_blank))
+    embeddings.append(pos_embedding(pos1, pos2, var_scope=var_scope, pos_embedding_dim=pos_embedding_dim, max_length=max_length))
+    if prepared_embedding is not None:
+        embeddings.append(prepared_embedding)
+    return tf.concat(embeddings, -1)

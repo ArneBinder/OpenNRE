@@ -154,6 +154,7 @@ class json_file_data_loader(file_data_loader):
         entpair2scope_file_name = os.path.join(processed_data_dir, name_prefix + '_entpair2scope.json')
         relfact2scope_file_name = os.path.join(processed_data_dir, name_prefix + '_relfact2scope.json')
         word_vec_mat_file_name = os.path.join(processed_data_dir, word_vec_name_prefix + '_mat.npy')
+        embedding_npy_file_name = os.path.join(processed_data_dir, name_prefix + '_embedding.npy')
         word2id_file_name = os.path.join(processed_data_dir, word_vec_name_prefix + '_word2id.json')
         if not os.path.exists(word_npy_file_name) or \
            not os.path.exists(pos1_npy_file_name) or \
@@ -164,6 +165,7 @@ class json_file_data_loader(file_data_loader):
            not os.path.exists(entpair2scope_file_name) or \
            not os.path.exists(relfact2scope_file_name) or \
            not os.path.exists(word_vec_mat_file_name) or \
+                (self.use_prepared_embeddings and not os.path.exists(embedding_npy_file_name)) or \
            not os.path.exists(word2id_file_name):
             return False
         print("Pre-processed files exist. Loading them...")
@@ -173,6 +175,9 @@ class json_file_data_loader(file_data_loader):
         self.data_rel = np.load(rel_npy_file_name)
         self.data_mask = np.load(mask_npy_file_name)
         self.data_length = np.load(length_npy_file_name)
+        if self.use_prepared_embeddings:
+            self.data_embedding = np.load(embedding_npy_file_name)
+            self.embedding_dims = self.data_embedding.shape[-1]
         self.entpair2scope = json.load(open(entpair2scope_file_name))
         self.relfact2scope = json.load(open(relfact2scope_file_name))
         self.word_vec_mat = np.load(word_vec_mat_file_name)
@@ -183,7 +188,7 @@ class json_file_data_loader(file_data_loader):
         print("Finish loading")
         return True
 
-    def __init__(self, file_name, word_vec_file_name, rel2id_file_name, mode, shuffle=True, max_length=120, case_sensitive=False, reprocess=False, batch_size=160):
+    def __init__(self, file_name, word_vec_file_name, rel2id_file_name, mode, shuffle=True, max_length=120, case_sensitive=False, reprocess=False, batch_size=160, use_prepared_embeddings=False):
         '''
         file_name: Json file storing the data in the following format
             [
@@ -224,6 +229,7 @@ class json_file_data_loader(file_data_loader):
         self.shuffle = shuffle
         self.batch_size = batch_size
         self.rel2id = json.load(open(rel2id_file_name))
+        self.use_prepared_embeddings = use_prepared_embeddings
 
         if reprocess or not self._load_preprocessed_file(): # Try to load pre-processed files:
             # Check files
@@ -248,6 +254,32 @@ class json_file_data_loader(file_data_loader):
                     self.ori_data[i]['head']['word'] = self.ori_data[i]['head']['word'].lower()
                     self.ori_data[i]['tail']['word'] = self.ori_data[i]['tail']['word'].lower()
                 print("Finish eliminating")
+
+            if self.use_prepared_embeddings:
+                print("Loading pre-calculated embedding data...")
+                fn = os.path.splitext(self.file_name)[0]
+                print('loading: %s ...' % fn)
+                embeddings_idx = np.load(os.path.join(fn, 'embeddings.idx.npy'))
+                embeddings_root_idx = np.load(os.path.join(fn, 'embeddings.roots.idx.npy'))
+                embeddings_data = np.load(os.path.join(fn, 'embeddings.context.npy'))
+                self.embedding_dims = embeddings_data.shape[-1]
+                print("Rearrange pre-calculated embedding data...")
+                i_root = 0
+                next_root = embeddings_root_idx[i_root + 1]
+                i = 0
+                i_start = 0
+                for i, idx in enumerate(embeddings_idx):
+                    if idx >= next_root:
+                        current_embeddings = embeddings_data[i_start:i-1]
+                        self.ori_data[i_root]['embedding'] = current_embeddings
+                        i_start = i
+                        i_root += 1
+                        next_root = embeddings_root_idx[i_root + 1] if i_root + 1 < len(embeddings_root_idx) else embeddings_idx[-1] + 1
+                if i > i_start:
+                    current_embeddings = embeddings_data[i_start:i - 1]
+                    self.ori_data[i_root]['embedding'] = current_embeddings
+            else:
+                self.embedding_dims = None
 
             # Sort data by entities and relations
             print("Sort data...")
@@ -281,6 +313,8 @@ class json_file_data_loader(file_data_loader):
             self.entpair2scope = {} # (head, tail) -> scope
             self.relfact2scope = {} # (head, tail, relation) -> scope
             self.data_word = np.zeros((self.instance_tot, self.max_length), dtype=np.int32)
+            if self.use_prepared_embeddings:
+                self.data_embedding = np.zeros((self.instance_tot, self.max_length, self.embedding_dims), dtype=np.float32)
             self.data_pos1 = np.zeros((self.instance_tot, self.max_length), dtype=np.int32)
             self.data_pos2 = np.zeros((self.instance_tot, self.max_length), dtype=np.int32)
             self.data_rel = np.zeros((self.instance_tot), dtype=np.int32)
@@ -378,6 +412,8 @@ class json_file_data_loader(file_data_loader):
                         self.data_mask[i][j] = 2
                     else:
                         self.data_mask[i][j] = 3
+                if self.use_prepared_embeddings:
+                    self.data_embedding[i][:ins['embedding'].shape[0]] = ins['embedding']
 
             if last_entpair != '':
                 self.entpair2scope[last_entpair] = [last_entpair_pos, self.instance_tot] # left closed right open
@@ -401,6 +437,8 @@ class json_file_data_loader(file_data_loader):
             np.save(os.path.join(processed_data_dir, name_prefix + '_rel.npy'), self.data_rel)
             np.save(os.path.join(processed_data_dir, name_prefix + '_mask.npy'), self.data_mask)
             np.save(os.path.join(processed_data_dir, name_prefix + '_length.npy'), self.data_length)
+            if self.use_prepared_embeddings:
+                np.save(os.path.join(processed_data_dir, name_prefix + '_embedding.npy'), self.data_embedding)
             json.dump(self.entpair2scope, open(os.path.join(processed_data_dir, name_prefix + '_entpair2scope.json'), 'w'))
             json.dump(self.relfact2scope, open(os.path.join(processed_data_dir, name_prefix + '_relfact2scope.json'), 'w'))
             np.save(os.path.join(processed_data_dir, word_vec_name_prefix + '_mat.npy'), self.word_vec_mat)
@@ -463,6 +501,8 @@ class json_file_data_loader(file_data_loader):
                 idx1 = len(self.order)
             self.idx = idx1
             batch_data['word'] = self.data_word[idx0:idx1]
+            if self.use_prepared_embeddings:
+                batch_data['embedding'] = self.data_embedding[idx0:idx1]
             batch_data['pos1'] = self.data_pos1[idx0:idx1]
             batch_data['pos2'] = self.data_pos2[idx0:idx1]
             batch_data['rel'] = self.data_rel[idx0:idx1]
@@ -472,6 +512,8 @@ class json_file_data_loader(file_data_loader):
             if idx1 - idx0 < batch_size:
                 padding = batch_size - (idx1 - idx0)
                 batch_data['word'] = np.concatenate([batch_data['word'], np.zeros((padding, self.data_word.shape[-1]), dtype=np.int32)])
+                if self.use_prepared_embeddings:
+                    batch_data['embedding'] = np.concatenate([batch_data['embedding'], np.zeros([padding] + self.data_embedding.shape[1:], dtype=np.float32)])
                 batch_data['pos1'] = np.concatenate([batch_data['pos1'], np.zeros((padding, self.data_pos1.shape[-1]), dtype=np.int32)])
                 batch_data['pos2'] = np.concatenate([batch_data['pos2'], np.zeros((padding, self.data_pos2.shape[-1]), dtype=np.int32)])
                 batch_data['mask'] = np.concatenate([batch_data['mask'], np.zeros((padding, self.data_mask.shape[-1]), dtype=np.int32)])
@@ -492,10 +534,13 @@ class json_file_data_loader(file_data_loader):
             _multi_rel = []
             _entpair = []
             _length = []
+            _embedding = []
             _scope = []
             cur_pos = 0
             for i in range(idx0, idx1):
                 _word.append(self.data_word[self.scope[self.order[i]][0]:self.scope[self.order[i]][1]])
+                if self.use_prepared_embeddings:
+                    _embedding.append(self.data_embedding[self.scope[self.order[i]][0]:self.scope[self.order[i]][1]])
                 _pos1.append(self.data_pos1[self.scope[self.order[i]][0]:self.scope[self.order[i]][1]])
                 _pos2.append(self.data_pos2[self.scope[self.order[i]][0]:self.scope[self.order[i]][1]])
                 _mask.append(self.data_mask[self.scope[self.order[i]][0]:self.scope[self.order[i]][1]])
@@ -513,6 +558,8 @@ class json_file_data_loader(file_data_loader):
                     _entpair.append(self.scope_name[self.order[i]])
             for i in range(batch_size - (idx1 - idx0)):
                 _word.append(np.zeros((1, self.data_word.shape[-1]), dtype=np.int32))
+                if self.use_prepared_embeddings:
+                    _embedding.append(np.zeros((1,) + self.data_embedding.shape[1:], dtype=np.int32))
                 _pos1.append(np.zeros((1, self.data_pos1.shape[-1]), dtype=np.int32))
                 _pos2.append(np.zeros((1, self.data_pos2.shape[-1]), dtype=np.int32))
                 _mask.append(np.zeros((1, self.data_mask.shape[-1]), dtype=np.int32))
@@ -525,6 +572,8 @@ class json_file_data_loader(file_data_loader):
                     _multi_rel.append(np.zeros((self.rel_tot), dtype=np.int32))
                     _entpair.append('None#None')
             batch_data['word'] = np.concatenate(_word)
+            if self.use_prepared_embeddings:
+                batch_data['embedding'] = np.concatenate(_embedding)
             batch_data['pos1'] = np.concatenate(_pos1)
             batch_data['pos2'] = np.concatenate(_pos2)
             batch_data['mask'] = np.concatenate(_mask)

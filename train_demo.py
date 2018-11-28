@@ -14,7 +14,9 @@ class model(nrekit.framework.re_model):
         self.mask = tf.placeholder(dtype=tf.int32, shape=[None, max_length], name="mask")
         
         # Embedding
-        x = nrekit.network.embedding.word_position_embedding(self.word, self.word_vec_mat, self.pos1, self.pos2)
+        x = nrekit.network.embedding.word_position_embedding(
+            self.word, self.word_vec_mat, self.pos1, self.pos2,
+            prepared_embedding=self.embedding if self.use_prepared_embeddings else None)
 
         # Encoder
         if model.encoder == "pcnn":
@@ -75,11 +77,8 @@ class model(nrekit.framework.re_model):
         return weights_table
 
 
-def main():
-    dataset_name = 'nyt'
-    if len(sys.argv) > 1:
-        dataset_name = sys.argv[1]
-    dataset_dir = os.path.join('./data', dataset_name)
+def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=True):
+    dataset_dir = os.path.join('./data', dataset)
     if not os.path.isdir(dataset_dir):
         raise Exception("[ERROR] Dataset dir %s doesn't exist!" % (dataset_dir))
 
@@ -88,22 +87,25 @@ def main():
                                                             os.path.join(dataset_dir, 'word_vec.json'),
                                                             os.path.join(dataset_dir, 'rel2id.json'),
                                                             mode=nrekit.data_loader.json_file_data_loader.MODE_RELFACT_BAG,
-                                                            shuffle=True)
+                                                            shuffle=True,
+                                                            use_prepared_embeddings=use_prepared_embeddings)
     test_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'test.json'),
                                                            os.path.join(dataset_dir, 'word_vec.json'),
                                                            os.path.join(dataset_dir, 'rel2id.json'),
                                                            mode=nrekit.data_loader.json_file_data_loader.MODE_ENTPAIR_BAG,
-                                                           shuffle=False)
+                                                           shuffle=False,
+                                                           use_prepared_embeddings=use_prepared_embeddings)
 
     framework = nrekit.framework.re_framework(train_loader, test_loader)
 
-    if len(sys.argv) > 2:
-        model.encoder = sys.argv[2]
-    if len(sys.argv) > 3:
-        model.selector = sys.argv[3]
+    model.encoder = encoder
+    model.selector = selector
 
-    framework.train(model, ckpt_dir="checkpoint", model_name=dataset_name + "_" + model.encoder + "_" + model.selector, max_epoch=60, gpu_nums=1)
+    framework.train(
+        model, ckpt_dir="checkpoint",
+        model_name=dataset + "_" + model.encoder + "_" + model.selector + '_pe' + str(use_prepared_embeddings),
+        max_epoch=60, gpu_nums=1)
 
 
 if __name__ == '__main__':
-    main()
+    import plac; plac.call(main)
