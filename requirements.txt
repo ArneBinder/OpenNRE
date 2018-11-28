@@ -3,5 +3,6 @@
 
 #tensorflow=1.4.1
 tensorflow=1.5
+# conda might attempt to downgrade from mkl to openblas. To avoid that, use: conda install -c anaconda scikit-learn
 scikit-learn
 plac
