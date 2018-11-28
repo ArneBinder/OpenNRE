@@ -44,7 +44,7 @@ def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=
         model, ckpt_dir=dir_checkpoint,
         summary_dir=dir_summary,
         model_name=model_name,
-        max_epoch=60, gpu_nums=None)
+        max_epoch=60, gpu_nums=1)
 
 
 if __name__ == '__main__':

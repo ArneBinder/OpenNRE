@@ -133,7 +133,7 @@ class re_framework:
               optimizer=tf.train.GradientDescentOptimizer,
               gpu_nums=1):
         
-        assert(gpu_nums is None or self.train_data_loader.batch_size % gpu_nums == 0)
+        assert(self.train_data_loader.batch_size % gpu_nums == 0)
         print("Start training...")
         
         # Init
@@ -143,30 +143,22 @@ class re_framework:
         
         # Multi GPUs
         tower_models = []
-        if gpu_nums is not None:
-            tower_grads = []
-            for gpu_id in range(gpu_nums):
-                print('use /gpu:%d' % gpu_id)
-                with tf.device("/gpu:%d" % gpu_id):
-                    with tf.name_scope("gpu_%d" % gpu_id):
-                        cur_model = model(self.train_data_loader, self.train_data_loader.batch_size // gpu_nums, self.train_data_loader.max_length)
-                        tower_grads.append(optimizer.compute_gradients(cur_model.loss()))
-                        tower_models.append(cur_model)
-                        tf.add_to_collection("loss", cur_model.loss())
-                        tf.add_to_collection("train_logit", cur_model.train_logit())
+        tower_grads = []
+        for gpu_id in range(gpu_nums):
+            print('use /gpu:%d' % gpu_id)
+            with tf.device("/gpu:%d" % gpu_id):
+                with tf.name_scope("gpu_%d" % gpu_id):
+                    cur_model = model(self.train_data_loader, self.train_data_loader.batch_size // gpu_nums, self.train_data_loader.max_length)
+                    tower_grads.append(optimizer.compute_gradients(cur_model.loss()))
+                    tower_models.append(cur_model)
+                    tf.add_to_collection("loss", cur_model.loss())
+                    tf.add_to_collection("train_logit", cur_model.train_logit())
 
-            loss_collection = tf.get_collection("loss")
-            loss = tf.add_n(loss_collection) / len(loss_collection)
-            train_logit_collection = tf.get_collection("train_logit")
-            train_logit = tf.concat(train_logit_collection, 0)
-            grads = average_gradients(tower_grads)
-        else:
-            cur_model = model(self.train_data_loader, self.train_data_loader.batch_size,
-                              self.train_data_loader.max_length)
-            tower_models.append(cur_model)
-            loss = cur_model.loss()
-            train_logit = cur_model.train_logit()
-            grads = optimizer.compute_gradients(cur_model.loss())
+        loss_collection = tf.get_collection("loss")
+        loss = tf.add_n(loss_collection) / len(loss_collection)
+        train_logit_collection = tf.get_collection("train_logit")
+        train_logit = tf.concat(train_logit_collection, 0)
+        grads = average_gradients(tower_grads)
 
         train_op = optimizer.apply_gradients(grads)
         summary_writer = tf.summary.FileWriter(summary_dir, self.sess.graph)

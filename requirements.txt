@@ -1,4 +1,7 @@
-tensorflow=1.4.1
-# to keep mkl, use: conda install -c anaconda scikit-learn
+
+# NOTE: use python 3, python 2 seems to cause conflicts related to cudnn versions
+
+#tensorflow=1.4.1
+tensorflow=1.5
 scikit-learn
 plac
