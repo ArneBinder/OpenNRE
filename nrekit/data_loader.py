@@ -268,16 +268,27 @@ class json_file_data_loader(file_data_loader):
                 next_root = embeddings_root_idx[i_root + 1]
                 i = 0
                 i_start = 0
+                sizes_embeddings = []
+                sizes_sentences = []
                 for i, idx in enumerate(embeddings_idx):
                     if idx >= next_root:
-                        current_embeddings = embeddings_data[i_start:i-1]
+                        sizes_embeddings.append(i - i_start)
+                        sizes_sentences.append(len(self.ori_data[i_root]['sentence'].split()))
+                        current_embeddings = embeddings_data[i_start:i]
                         self.ori_data[i_root]['embedding'] = current_embeddings
                         i_start = i
                         i_root += 1
                         next_root = embeddings_root_idx[i_root + 1] if i_root + 1 < len(embeddings_root_idx) else embeddings_idx[-1] + 1
                 if i > i_start:
-                    current_embeddings = embeddings_data[i_start:i - 1]
+                    current_embeddings = embeddings_data[i_start:i]
                     self.ori_data[i_root]['embedding'] = current_embeddings
+
+                sizes_embeddings = np.array(sizes_embeddings)
+                sizes_sentences = np.array(sizes_sentences)
+                for idx in np.nonzero(sizes_embeddings != sizes_sentences)[0]:
+                    print('found size mismatch (ID: %s, sen: %i, emb: %i): "%s"'
+                          % (self.ori_data[idx]['id'], sizes_sentences[idx], sizes_embeddings[idx],
+                             self.ori_data[idx]['sentence']))
             else:
                 self.embedding_dims = None
 
