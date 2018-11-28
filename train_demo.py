@@ -77,11 +77,15 @@ class model(nrekit.framework.re_model):
         return weights_table
 
 
-def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=True):
+def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=False):
     dataset_dir = os.path.join('./data', dataset)
     if not os.path.isdir(dataset_dir):
         raise Exception("[ERROR] Dataset dir %s doesn't exist!" % (dataset_dir))
 
+    if use_prepared_embeddings:
+        print('use prepared embeddings')
+    else:
+        print('do not use prepared embeddings')
     # The first 3 parameters are train / test data file name, word embedding file name and relation-id mapping file name respectively.
     train_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'train.json'),
                                                             os.path.join(dataset_dir, 'word_vec.json'),
