@@ -248,7 +248,7 @@ class json_file_data_loader(file_data_loader):
 
             # Eliminate case sensitive
             if not case_sensitive:
-                print("Elimiating case sensitive problem...")
+                print("Eliminating case sensitive problem...")
                 for i in range(len(self.ori_data)):
                     self.ori_data[i]['sentence'] = self.ori_data[i]['sentence'].lower()
                     self.ori_data[i]['head']['word'] = self.ori_data[i]['head']['word'].lower()
@@ -256,39 +256,60 @@ class json_file_data_loader(file_data_loader):
                 print("Finish eliminating")
 
             if self.add_embeddings is not None:
-                print("Loading pre-calculated embedding data...")
-                fn = os.path.splitext(self.file_name)[0]
-                print('loading: %s ...' % fn)
-                embeddings_idx = np.load(os.path.join(fn, 'embeddings.idx.npy'))
-                embeddings_root_idx = np.load(os.path.join(fn, 'embeddings.roots.idx.npy'))
-                embeddings_data = np.load(os.path.join(fn, 'embeddings.context.npy'))
-                self.embedding_dims = embeddings_data.shape[-1]
-                print("Rearrange pre-calculated embedding data...")
-                i_root = 0
-                next_root = embeddings_root_idx[i_root + 1]
-                i = 0
-                i_start = 0
-                sizes_embeddings = []
-                sizes_sentences = []
-                for i, idx in enumerate(embeddings_idx):
-                    if idx >= next_root:
-                        sizes_embeddings.append(i - i_start)
-                        sizes_sentences.append(len(self.ori_data[i_root]['sentence'].split()))
+
+                if self.add_embeddings.strip() == 'load':
+                    print("Loading pre-calculated embedding data...")
+                    fn = os.path.splitext(self.file_name)[0]
+                    print('loading: %s ...' % fn)
+                    embeddings_idx = np.load(os.path.join(fn, 'embeddings.idx.npy'))
+                    embeddings_root_idx = np.load(os.path.join(fn, 'embeddings.roots.idx.npy'))
+                    embeddings_data = np.load(os.path.join(fn, 'embeddings.context.npy'))
+                    self.embedding_dims = embeddings_data.shape[-1]
+                    print("Rearrange pre-calculated embedding data...")
+                    i_root = 0
+                    next_root = embeddings_root_idx[i_root + 1]
+                    i = 0
+                    i_start = 0
+                    sizes_embeddings = []
+                    sizes_sentences = []
+                    for i, idx in enumerate(embeddings_idx):
+                        if idx >= next_root:
+                            sizes_embeddings.append(i - i_start)
+                            sizes_sentences.append(len(self.ori_data[i_root]['sentence'].split()))
+                            current_embeddings = embeddings_data[i_start:i]
+                            self.ori_data[i_root]['embedding'] = current_embeddings
+                            i_start = i
+                            i_root += 1
+                            next_root = embeddings_root_idx[i_root + 1] if i_root + 1 < len(embeddings_root_idx) else embeddings_idx[-1] + 1
+                    if i > i_start:
                         current_embeddings = embeddings_data[i_start:i]
                         self.ori_data[i_root]['embedding'] = current_embeddings
-                        i_start = i
-                        i_root += 1
-                        next_root = embeddings_root_idx[i_root + 1] if i_root + 1 < len(embeddings_root_idx) else embeddings_idx[-1] + 1
-                if i > i_start:
-                    current_embeddings = embeddings_data[i_start:i]
-                    self.ori_data[i_root]['embedding'] = current_embeddings
 
-                sizes_embeddings = np.array(sizes_embeddings)
-                sizes_sentences = np.array(sizes_sentences)
-                for idx in np.nonzero(sizes_embeddings != sizes_sentences)[0]:
-                    print('found size mismatch (ID: %s, sen: %i, emb: %i): "%s"'
-                          % (self.ori_data[idx]['id'], sizes_sentences[idx], sizes_embeddings[idx],
-                             self.ori_data[idx]['sentence']))
+                    sizes_embeddings = np.array(sizes_embeddings)
+                    sizes_sentences = np.array(sizes_sentences)
+                    for idx in np.nonzero(sizes_embeddings != sizes_sentences)[0]:
+                        print('found size mismatch (ID: %s, sen: %i, emb: %i): "%s"'
+                              % (self.ori_data[idx]['id'], sizes_sentences[idx], sizes_embeddings[idx],
+                                 self.ori_data[idx]['sentence']))
+                elif self.add_embeddings.strip().startswith('random'):
+                    self.embedding_dims = 300
+                    if '#' in self.add_embeddings.strip():
+                        self.embedding_dims = int(self.add_embeddings.strip().split('#')[-1])
+                    print('create random embeddings with %i dimensions' % self.embedding_dims)
+                    for i in range(len(self.ori_data)):
+                        sen_length = len(self.ori_data[i]['sentence'].split())
+                        self.ori_data[i]['embedding'] = np.random.uniform(size=sen_length * self.embedding_dims).reshape((sen_length, self.embedding_dims))
+                elif self.add_embeddings.strip().startswith('zero'):
+                    self.embedding_dims = 300
+                    if '#' in self.add_embeddings.strip():
+                        self.embedding_dims = int(self.add_embeddings.strip().split('#')[-1])
+                    print('create zero embeddings with %i dimensions' % self.embedding_dims)
+                    for i in range(len(self.ori_data)):
+                        sen_length = len(self.ori_data[i]['sentence'].split())
+                        self.ori_data[i]['embedding'] = np.zeros(shape=(sen_length, self.embedding_dims), dtype=np.float32)
+                else:
+                    raise Exception('unknown value for add_embeddings. Use "load", "random#<dims>" or "zero#<dims>" where dims is the number of dimensions')
+
             else:
                 self.embedding_dims = None
 

@@ -7,28 +7,34 @@ from model_demo import model, get_name
 def main(dataset: ('name of dataset in data folder', 'option', 'd', str)='nyt',
          encoder: ('encoder', 'option', 'e', str)='pcnn',
          selector: ('selector', 'option', 's', str)='att',
-         add_embeddings: ('add these type of embeddings if not None', 'option', 'a', str)=None):
+         add_embeddings: ('add these type of embeddings if not None', 'option', 'a', str)=None,
+         reprocess: ('reprocess data', 'flag', 'r')=False,
+         ):
     dataset_dir = os.path.join('./data', dataset)
     if not os.path.isdir(dataset_dir):
         raise Exception("[ERROR] Dataset dir %s doesn't exist!" % (dataset_dir))
 
     if add_embeddings is not None:
-        print('use prepared embeddings')
+        print('use embeddings: %s' % add_embeddings)
     else:
         print('do not use prepared embeddings')
+    if reprocess:
+        print('ATTENTION: reprocess data')
     # The first 3 parameters are train / test data file name, word embedding file name and relation-id mapping file name respectively.
     train_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'train.json'),
                                                             os.path.join(dataset_dir, 'word_vec.json'),
                                                             os.path.join(dataset_dir, 'rel2id.json'),
                                                             mode=nrekit.data_loader.json_file_data_loader.MODE_RELFACT_BAG,
                                                             shuffle=True,
-                                                            add_embeddings=add_embeddings)
+                                                            add_embeddings=add_embeddings,
+                                                            reprocess=reprocess)
     test_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'test.json'),
                                                            os.path.join(dataset_dir, 'word_vec.json'),
                                                            os.path.join(dataset_dir, 'rel2id.json'),
                                                            mode=nrekit.data_loader.json_file_data_loader.MODE_ENTPAIR_BAG,
                                                            shuffle=False,
-                                                           add_embeddings=add_embeddings)
+                                                           add_embeddings=add_embeddings,
+                                                           reprocess=reprocess)
 
     framework = nrekit.framework.re_framework(train_loader, test_loader)
 
