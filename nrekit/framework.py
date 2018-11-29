@@ -209,10 +209,10 @@ class re_framework:
             if (epoch + 1) % test_epoch == 0:
                 metric = self.test(model)
                 if metric > best_metric:
+                    print("Best model (+%f), storing..." % (metric - best_metric))
                     best_metric = metric
                     best_prec = self.cur_prec
                     best_recall = self.cur_recall
-                    print("Best model (+%f), storing..." % (metric - best_metric))
                     if not os.path.isdir(ckpt_dir):
                         os.mkdir(ckpt_dir)
                     path = saver.save(self.sess, os.path.join(ckpt_dir, model_name))
