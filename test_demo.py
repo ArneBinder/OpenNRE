@@ -56,7 +56,8 @@ def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=
 
         eval_as_semeval(pred_result, rel2id, fn_predictions_semeval,
                         fn_gold_tsv=os.path.join(dataset_dir, 'TEST_FILE_KEY_DIRECTION.TXT'),
-                        fn_script=os.path.join(dataset_dir, 'semeval2010_task8_scorer-v1.2.pl'))
+                        fn_script=os.path.join(dataset_dir, 'semeval2010_task8_scorer-v1.2.pl'),
+                        fn_eval=os.path.join('./test_result', 'out.txt'))
 
 
 def convert_semeval_full_test_file_to_key_w_direction(fn_test_file_full, fn_test_file_key_direction):
@@ -67,7 +68,7 @@ def convert_semeval_full_test_file_to_key_w_direction(fn_test_file_full, fn_test
     open(fn_test_file_key_direction, 'w').writelines(('%s\t%s\n' % (_id, _rel) for _id, _rel in res))
 
 
-def eval_as_semeval(res, rel2id, fn_predictions_tsv, fn_gold_tsv, fn_script):
+def eval_as_semeval(res, rel2id, fn_predictions_tsv, fn_gold_tsv, fn_script, fn_eval):
     rel2id_rev = {v: k for k, v in rel2id.items()}
     _res = {}
 
@@ -90,6 +91,7 @@ def eval_as_semeval(res, rel2id, fn_predictions_tsv, fn_gold_tsv, fn_script):
 
     check_script = 'perl %s %s %s' % (fn_script, fn_predictions_tsv, fn_gold_tsv)
     perl_result = subprocess.check_output(check_script, shell=True).decode("utf-8")
+    open(fn_eval, 'w').write(perl_result)
     last_line = perl_result.split('\n')[-2]
     score_str = last_line.replace('<<< The official score is (9+1)-way evaluation with directionality taken into account: macro-averaged F1 = ', '').replace('% >>>', '')
     f1 = float(score_str) / 100
