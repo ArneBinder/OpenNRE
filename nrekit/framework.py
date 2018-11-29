@@ -174,6 +174,7 @@ class re_framework:
         best_metric = 0
         best_prec = None
         best_recall = None
+        best_epoch = 0
         not_best_count = 0 # Stop training after several epochs without improvement.
         for epoch in range(max_epoch):
             print('###### Epoch ' + str(epoch) + ' ######')
@@ -211,12 +212,13 @@ class re_framework:
                     best_metric = metric
                     best_prec = self.cur_prec
                     best_recall = self.cur_recall
-                    print("Best model, storing...")
+                    print("Best model (+%f), storing..." % (metric - best_metric))
                     if not os.path.isdir(ckpt_dir):
                         os.mkdir(ckpt_dir)
                     path = saver.save(self.sess, os.path.join(ckpt_dir, model_name))
                     print("Finish storing")
                     not_best_count = 0
+                    best_epoch = epoch
                 else:
                     not_best_count += 1
 
@@ -225,7 +227,7 @@ class re_framework:
         
         print("######")
         print("Finish training " + model_name)
-        print("Best epoch auc = %f" % (best_metric))
+        print("Best epoch=%i auc = %f" % (best_epoch, best_metric))
         if (not best_prec is None) and (not best_recall is None):
             if not os.path.isdir(test_result_dir):
                 os.mkdir(test_result_dir)
