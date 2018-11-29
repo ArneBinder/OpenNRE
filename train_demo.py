@@ -4,12 +4,15 @@ import os
 from model_demo import model, get_name
 
 
-def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=False):
+def main(dataset: ('name of dataset in data folder', 'option', 'd', str)='nyt',
+         encoder: ('encoder', 'option', 'e', str)='pcnn',
+         selector: ('selector', 'option', 's', str)='att',
+         add_embeddings: ('add these type of embeddings if not None', 'option', 'a', str)=None):
     dataset_dir = os.path.join('./data', dataset)
     if not os.path.isdir(dataset_dir):
         raise Exception("[ERROR] Dataset dir %s doesn't exist!" % (dataset_dir))
 
-    if use_prepared_embeddings:
+    if add_embeddings is not None:
         print('use prepared embeddings')
     else:
         print('do not use prepared embeddings')
@@ -19,13 +22,13 @@ def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=
                                                             os.path.join(dataset_dir, 'rel2id.json'),
                                                             mode=nrekit.data_loader.json_file_data_loader.MODE_RELFACT_BAG,
                                                             shuffle=True,
-                                                            use_prepared_embeddings=use_prepared_embeddings)
+                                                            add_embeddings=add_embeddings)
     test_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'test.json'),
                                                            os.path.join(dataset_dir, 'word_vec.json'),
                                                            os.path.join(dataset_dir, 'rel2id.json'),
                                                            mode=nrekit.data_loader.json_file_data_loader.MODE_ENTPAIR_BAG,
                                                            shuffle=False,
-                                                           use_prepared_embeddings=use_prepared_embeddings)
+                                                           add_embeddings=add_embeddings)
 
     framework = nrekit.framework.re_framework(train_loader, test_loader)
 
@@ -33,7 +36,7 @@ def main(dataset='nyt', encoder='pcnn', selector='att', use_prepared_embeddings=
     model.selector = selector
 
     #model_name = dataset + "_" + model.encoder + "_" + model.selector + '_pe' + str(use_prepared_embeddings)
-    model_name = get_name(dataset, model.encoder, model.selector, use_prepared_embeddings)
+    model_name = get_name(dataset, model.encoder, model.selector, add_embeddings)
     dir_train = os.path.join('./train', model_name)
     if not os.path.exists(dir_train):
         os.makedirs(dir_train)

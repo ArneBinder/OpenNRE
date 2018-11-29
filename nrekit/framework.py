@@ -44,8 +44,8 @@ def average_gradients(tower_grads):
 
 class re_model:
     def __init__(self, train_data_loader, batch_size, max_length=120):
-        self.use_prepared_embeddings = train_data_loader.use_prepared_embeddings
-        if self.use_prepared_embeddings:
+        self.add_embeddings = train_data_loader.add_embeddings
+        if self.add_embeddings is not None:
             self.embedding_dims = train_data_loader.embedding_dims
             self.embedding = tf.placeholder(dtype=tf.float32, shape=[None, max_length, self.embedding_dims], name='embedding')
         self.word = tf.placeholder(dtype=tf.int32, shape=[None, max_length], name='word')
@@ -76,7 +76,7 @@ class re_framework:
         self.train_data_loader = train_data_loader
         self.test_data_loader = test_data_loader
         self.sess = None
-        self.use_prepared_embeddings = train_data_loader.use_prepared_embeddings
+        self.add_embeddings = train_data_loader.add_embeddings
 
     def one_step_multi_models(self, sess, models, batch_data_gen, run_array, return_label=True):
         feed_dict = {}
@@ -92,7 +92,7 @@ class re_framework:
                 model.scope: batch_data['scope'],
                 model.length: batch_data['length'],
             })
-            if self.use_prepared_embeddings:
+            if self.add_embeddings is not None:
                 feed_dict[model.embedding] = batch_data['embedding']
             if 'mask' in batch_data and hasattr(model, "mask"):
                 feed_dict.update({model.mask: batch_data['mask']})
@@ -113,7 +113,7 @@ class re_framework:
             model.scope: batch_data['scope'],
             model.length: batch_data['length'],
         }
-        if self.use_prepared_embeddings:
+        if self.add_embeddings is not None:
             feed_dict[model.embedding] = batch_data['embedding']
         if 'mask' in batch_data and hasattr(model, "mask"):
             feed_dict.update({model.mask: batch_data['mask']})

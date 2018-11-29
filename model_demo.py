@@ -14,7 +14,7 @@ class model(nrekit.framework.re_model):
         # Embedding
         x = nrekit.network.embedding.word_position_embedding(
             self.word, self.word_vec_mat, self.pos1, self.pos2,
-            prepared_embedding=self.embedding if self.use_prepared_embeddings else None)
+            prepared_embedding=self.embedding if self.add_embeddings else None)
 
         # Encoder
         if model.encoder == "pcnn":
