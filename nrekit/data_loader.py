@@ -257,13 +257,19 @@ class json_file_data_loader(file_data_loader):
 
             if self.add_embeddings is not None:
 
-                if self.add_embeddings.strip() == 'load':
+                if self.add_embeddings.strip().startswith('load'):
                     print("Loading pre-calculated embedding data...")
                     fn = os.path.splitext(self.file_name)[0]
                     print('loading: %s ...' % fn)
                     embeddings_idx = np.load(os.path.join(fn, 'embeddings.idx.npy'))
                     embeddings_root_idx = np.load(os.path.join(fn, 'embeddings.roots.idx.npy'))
-                    embeddings_data = np.load(os.path.join(fn, 'embeddings.context.npy'))
+                    _data_fn = 'embeddings.context.npy'
+                    if '#' in self.add_embeddings.strip():
+                        _data_fn = self.add_embeddings.strip().split('#')[-1]
+                    print('load embeddings from: %s' % _data_fn)
+                    embeddings_data = np.load(os.path.join(fn, _data_fn))
+                    if len(embeddings_data.shape) == 1:
+                        embeddings_data = embeddings_data.reshape(embeddings_data.shape + (1,))
                     self.embedding_dims = embeddings_data.shape[-1]
                     print("Rearrange pre-calculated embedding data...")
                     i_root = 0
