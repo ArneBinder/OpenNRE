@@ -14,12 +14,28 @@ def main(dataset: ('name of dataset in data folder', 'option', 'd', str)='nyt',
     if not os.path.isdir(dataset_dir):
         raise Exception("[ERROR] Dataset dir %s doesn't exist!" % (dataset_dir))
 
+    model.encoder = encoder
+    model.selector = selector
+
+    # model_name = dataset + "_" + model.encoder + "_" + model.selector + '_pe' + str(use_prepared_embeddings)
+    model_name = get_name(dataset, model.encoder, model.selector, add_embeddings)
+    dir_train = os.path.join('./train', model_name)
+    if not os.path.exists(dir_train):
+        os.makedirs(dir_train)
+    dir_checkpoint = os.path.join(dir_train, "checkpoint")
+    dir_summary = os.path.join(dir_train, "summary")
+
     if add_embeddings is not None:
         print('use embeddings: %s' % add_embeddings)
     else:
         print('do not use prepared embeddings')
     if reprocess:
-        print('ATTENTION: reprocess data')
+        print('ATTENTION: reprocess data and retrain')
+        if os.path.exists(dir_checkpoint):
+            os.remove(dir_checkpoint)
+        if os.path.exists(dir_checkpoint):
+            os.remove(dir_summary)
+
     # The first 3 parameters are train / test data file name, word embedding file name and relation-id mapping file name respectively.
     train_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'train.json'),
                                                             os.path.join(dataset_dir, 'word_vec.json'),
@@ -37,17 +53,6 @@ def main(dataset: ('name of dataset in data folder', 'option', 'd', str)='nyt',
                                                            reprocess=reprocess)
 
     framework = nrekit.framework.re_framework(train_loader, test_loader)
-
-    model.encoder = encoder
-    model.selector = selector
-
-    #model_name = dataset + "_" + model.encoder + "_" + model.selector + '_pe' + str(use_prepared_embeddings)
-    model_name = get_name(dataset, model.encoder, model.selector, add_embeddings)
-    dir_train = os.path.join('./train', model_name)
-    if not os.path.exists(dir_train):
-        os.makedirs(dir_train)
-    dir_checkpoint = os.path.join(dir_train, "checkpoint")
-    dir_summary = os.path.join(dir_train, "summary")
 
     framework.train(
         model, ckpt_dir=dir_checkpoint,
