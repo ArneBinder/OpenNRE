@@ -70,7 +70,7 @@ def main(dataset: ('name of dataset in data folder', 'option', 'd', str)='nyt',
         eval_as_semeval(pred_result, rel2id, fn_predictions_semeval,
                         fn_gold_tsv=os.path.join(dataset_dir, 'TEST_FILE_KEY_DIRECTION.TXT'),
                         fn_script=os.path.join(dataset_dir, 'semeval2010_task8_scorer-v1.2.pl'),
-                        fn_eval=os.path.join('./test_result', 'out.txt'))
+                        fn_eval=os.path.splitext(out_fn)[0] + '_semeval_eval.txt')
 
 
 def convert_semeval_full_test_file_to_key_w_direction(fn_test_file_full, fn_test_file_key_direction):
