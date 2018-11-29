@@ -1,5 +1,6 @@
 import nrekit
 import os
+import shutil
 
 from model_demo import model, get_name
 
@@ -32,9 +33,11 @@ def main(dataset: ('name of dataset in data folder', 'option', 'd', str)='nyt',
     if reprocess:
         print('ATTENTION: reprocess data and retrain')
         if os.path.exists(dir_checkpoint):
-            os.remove(dir_checkpoint)
+            #os.remove(dir_checkpoint)
+            shutil.rmtree(dir_checkpoint)
         if os.path.exists(dir_checkpoint):
-            os.remove(dir_summary)
+            #os.remove(dir_summary)
+            shutil.rmtree(dir_summary)
 
     # The first 3 parameters are train / test data file name, word embedding file name and relation-id mapping file name respectively.
     train_loader = nrekit.data_loader.json_file_data_loader(os.path.join(dataset_dir, 'train.json'),
